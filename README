@@ -1,0 +1,23 @@
+libsyspower is a Linux library for managing power state and wakeup sources.
+
+== build ==
+mkdir build && cd build
+cmake ../
+make
+
+=== tools ===
+prompt: ~/ ./syspowerwakesrc list
+Device                         HW wakeup
+|- 2-0024                      [disabled]
+|- 30b10000.usb                [disabled]
+|- ci_hdrc.1                   [disabled]
+|- 30b20000.usb                [disabled]
+|- ci_hdrc.0                   [disabled]
+|- 0-0009                      [enabled]
+|- 1-0066                      [disabled]
+|- 30370000.snvs:snvs-rtc-lp   [enabled]
+|- 30370000.snvs:snvs-powerkey [enabled]
+prompt: ~/ ./syspowerwakesrc enable 2-0024
+prompt: ~/ ./syspowernap 
+Sleeping now...
+Wakeup! (2-0024/irq:74)
