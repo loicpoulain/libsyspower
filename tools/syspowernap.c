@@ -33,7 +33,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	ret = syspower_suspend(SYSPOWER_SLEEP_TYPE_MEM);
+	ret = syspower_suspend(SYSPOWER_SLEEP_TYPE_STANDBY);
+	if (ret)
+		ret = syspower_suspend(SYSPOWER_SLEEP_TYPE_MEM);
 	if (ret) {
 		perror("Unable to sleep\n");
 		return ret;

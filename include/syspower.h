@@ -17,9 +17,10 @@ extern "C" {
 #include <stdint.h>
 
 enum syspower_sleep_type {
-	SYSPOWER_SLEEP_TYPE_MEM,
-	SYSPOWER_SLEEP_TYPE_STANDBY,
 	SYSPOWER_SLEEP_TYPE_FREEZE,
+	SYSPOWER_SLEEP_TYPE_STANDBY,
+	SYSPOWER_SLEEP_TYPE_MEM,
+	SYSPOWER_SLEEP_TYPE_HIBERNATE,
 	SYSPOWER_SLEEP_TYPE_MAX
 };
 
@@ -73,6 +74,34 @@ int syspower_rtc_wakealarm(unsigned int seconds, bool wait);
  * @return IRQ index on success, negative value on error.
  */
 int syspower_wakeup_reason(char *reason, size_t reason_len);
+
+/**
+ * @brief Retrieve wakeup capable device name by index.
+ * @param index index of the device.
+ * @return device name.
+ */
+const char *syspower_wakeup_get(unsigned int index);
+
+/**
+ * @brief Check if wakeup is enabled for the given device.
+ * @param device name.
+ * @return true if wakeup is enabled, false otherwise.
+ */
+bool syspower_wakeup_enabled(const char *devname);
+
+/**
+ * @brief Enable wakeup for the given device.
+ * @param device name.
+ * @return 0 on success, negative value on error.
+ */
+int syspower_wakeup_enable(const char *devname);
+
+/**
+ * @brief Disable wakeup for the given device.
+ * @param device name.
+ * @return 0 on success, negative value on error.
+ */
+int syspower_wakeup_disable(const char *devname);
 
 #ifdef __cplusplus
 } /* extern "C" */

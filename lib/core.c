@@ -14,10 +14,13 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <syspower.h>
+#include <libgen.h>
 
 #include <sys/ioctl.h>
 #include <linux/rtc.h>
+#include <linux/limits.h>
 
 static const char path_autosleep[] = "/sys/power/autosleep";
 static const char path_wake_unlock[] = "/sys/power/wake_unlock";
@@ -25,6 +28,13 @@ static const char path_wake_lock[] = "/sys/power/wake_lock";
 static const char path_state[] = "/sys/power/state";
 static const char path_wakeup_irq[] = "/sys/power/pm_wakeup_irq";
 static const char path_rtc_dev[] = "/dev/rtc";
+
+#define WAKEDEV_COUNT 1024
+
+struct wakeup_source {
+	char name[256];
+	char devpath[PATH_MAX + 1];
+};
 
 static struct {
 	int fd_lock;
@@ -34,12 +44,14 @@ static struct {
 	int fd_wakeup;
 	int fd_rtc;
 	unsigned int sleep_mask;
+	struct wakeup_source *wakeup_cache[WAKEDEV_COUNT];
 } syspower;
 
 static const char *sleep_state[] = {
 	[SYSPOWER_SLEEP_TYPE_MEM] = "mem\n",
 	[SYSPOWER_SLEEP_TYPE_STANDBY] = "standby\n",
 	[SYSPOWER_SLEEP_TYPE_FREEZE] = "freeze\n",
+	[SYSPOWER_SLEEP_TYPE_HIBERNATE] = "disk\n",
 };
 
 static inline int OPEN_RETRY(const char *path, int flags)
@@ -253,4 +265,182 @@ int syspower_wake_unlock(const char *name)
 		return -errno;
 
 	return 0;
+}
+
+static int __read_attribute(char *value, const char *path, const char *name)
+{
+	char attr_path[PATH_MAX + 1];
+	int fd, ret;
+
+	snprintf(attr_path, sizeof(attr_path), "%s/%s", path, name);
+
+	fd = OPEN_RETRY(attr_path, O_RDONLY);
+	if (fd < 0)
+		return -errno;
+
+	ret = READ_RETRY(fd, value, 256);
+	if (ret < 0) {
+		close(fd);
+		return -errno;
+	}
+
+	/* remove \n from attribute */
+	value[ret - 1] = '\0';
+
+	close(fd);
+
+	return 0;
+}
+
+static int __write_attribute(char *value, const char *path, const char *name)
+{
+	char attr_path[PATH_MAX + 1];
+	int fd, ret;
+
+	snprintf(attr_path, sizeof(attr_path), "%s/%s", path, name);
+
+	fd = OPEN_RETRY(attr_path, O_WRONLY);
+	if (fd < 0)
+		return -errno;
+
+	ret = WRITE_RETRY(fd, value, strlen(value) + 1);
+	if (ret < 0) {
+		close(fd);
+		return -errno;
+	}
+
+	close(fd);
+
+	return 0;
+}
+
+static void __sysfs_devices_parse(char *path, void (*cb)(char *devpath))
+{
+	size_t len = strlen(path);
+	struct dirent *dir;
+	DIR *d;
+
+	d = opendir(path);
+
+	while ((dir = readdir(d))) {
+		if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
+			continue;
+
+		path[len] = '\0';
+
+		switch (dir->d_type) {
+		case DT_DIR:
+			path = strcat(path, "/");
+			path = strcat(path, dir->d_name);
+			__sysfs_devices_parse(path, cb);
+			break;
+		case DT_LNK:
+			/* only report driven devices */
+			if (!strcmp(dir->d_name, "driver"))
+				cb(path);
+			break;
+		default:
+			continue;
+		}
+	}
+
+	closedir(d);
+}
+
+void __syspower_new_device(char *devpath)
+{
+	unsigned int i = 0;
+	char value[256];
+	char *devname;
+
+	/* Filter devices without wakeup capability */
+	if (__read_attribute(value, devpath, "power/wakeup"))
+		return;
+
+	/* register device to local cache */
+	while (syspower.wakeup_cache[i]) i++;
+
+	if (i >= WAKEDEV_COUNT)
+		return;
+
+	syspower.wakeup_cache[i] = malloc(sizeof(struct wakeup_source));
+	if (!syspower.wakeup_cache[i])
+		return;
+
+	devname = basename(devpath);
+	memcpy(syspower.wakeup_cache[i]->name, devname, strlen(devname) + 1);
+	realpath(devpath, syspower.wakeup_cache[i]->devpath);
+}
+
+static void __wakeup_cache_update(void)
+{
+	char current_path[PATH_MAX + 1] = "/sys/devices";
+
+	memset(syspower.wakeup_cache, 0, sizeof(syspower.wakeup_cache));
+	__sysfs_devices_parse(current_path, __syspower_new_device);
+}
+
+static struct wakeup_source *__wakeup_source_lookup(const char *name)
+{
+	unsigned int i = 0;
+
+	if (!syspower.wakeup_cache[0])
+		__wakeup_cache_update(); /* TODO: smart cache update */
+
+	if (!syspower.wakeup_cache[0])
+		return NULL;
+
+	while (syspower.wakeup_cache[i]) {
+		if (!strcmp(name, syspower.wakeup_cache[i]->name))
+			return syspower.wakeup_cache[i];
+		i++;
+	}
+
+	return NULL;
+}
+
+const char *syspower_wakeup_get(unsigned int index)
+{
+	if (index >= WAKEDEV_COUNT)
+		return NULL;
+
+	if (!syspower.wakeup_cache[0])
+		__wakeup_cache_update(); /* TODO: smart cache update */
+
+	return syspower.wakeup_cache[index]->name;
+}
+
+int syspower_wakeup_enable(const char *wakeupname)
+{
+	struct wakeup_source *ws = __wakeup_source_lookup(wakeupname);
+
+	if (!ws)
+		return -ENOENT;
+
+	return __write_attribute("enabled", ws->devpath, "power/wakeup");
+}
+
+int syspower_wakeup_disable(const char *wakeupname)
+{
+	struct wakeup_source *ws = __wakeup_source_lookup(wakeupname);
+
+	if (!ws)
+		return -ENOENT;
+
+	return __write_attribute("disabled", ws->devpath, "power/wakeup");
+}
+
+bool syspower_wakeup_enabled(const char *wakeupname)
+{
+	struct wakeup_source *ws = __wakeup_source_lookup(wakeupname);
+	char attr[128];
+
+	if (!ws)
+		return -ENOENT;
+
+	__read_attribute(attr, ws->devpath, "power/wakeup");
+	if (!strncmp("enabled", attr, strlen("enabled")))
+		return true;
+
+	return false;
 }
