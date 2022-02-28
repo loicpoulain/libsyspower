@@ -1,3 +1,5 @@
+libsyspower is a Linux library for managing power state and wakeup sources.
+
 == build ==
 mkdir build && cd build
 cmake ../
