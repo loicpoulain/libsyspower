@@ -112,7 +112,7 @@ int syspower_rtc_wakealarm(unsigned int seconds, bool wait)
 	unsigned long data;
 	int ret;
 
-	if (ret = __open_once(&syspower.fd_rtc, path_rtc_dev, O_RDWR))
+	if ((ret = __open_once(&syspower.fd_rtc, path_rtc_dev, O_RDWR)))
 		return ret;
 
 	ret = ioctl(syspower.fd_rtc, RTC_RD_TIME, &rtc_tm);
@@ -155,7 +155,7 @@ int syspower_autosleep_enable(enum syspower_sleep_type type)
 
 	len = strlen(sleep_state[type]) + 1;
 
-	if (ret = __open_once(&syspower.fd_autosleep, path_autosleep, O_WRONLY))
+	if ((ret = __open_once(&syspower.fd_autosleep, path_autosleep, O_WRONLY)))
 		return ret;
 
 	ret = WRITE_RETRY(syspower.fd_autosleep, sleep_state[type], len);
@@ -171,7 +171,7 @@ int syspower_autosleep_disable(void)
 
 	len = strlen("off") + 1;
 
-	if (ret = __open_once(&syspower.fd_state, path_autosleep, O_WRONLY))
+	if ((ret = __open_once(&syspower.fd_state, path_autosleep, O_WRONLY)))
 		return ret;
 
 	ret = WRITE_RETRY(syspower.fd_state, "off", len);
@@ -191,7 +191,7 @@ int syspower_suspend(enum syspower_sleep_type type)
 
 	len = strlen(sleep_state[type]) + 1;
 
-	if (ret = __open_once(&syspower.fd_state, path_state, O_RDWR))
+	if ((ret = __open_once(&syspower.fd_state, path_state, O_RDWR)))
 		return ret;
 
 	ret = WRITE_RETRY(syspower.fd_state, sleep_state[type], len);
@@ -207,7 +207,7 @@ int syspower_wake_lock(const char *name, unsigned int timeout_ms)
 	size_t len;
 	int ret;
 
-	if (ret = __open_once(&syspower.fd_lock, path_wake_lock, O_WRONLY))
+	if ((ret = __open_once(&syspower.fd_lock, path_wake_lock, O_WRONLY)))
 		return ret;
 
 	if (timeout_ms)
@@ -229,7 +229,7 @@ int syspower_wakeup_reason(char *reason, size_t reason_len)
 	int irq, ret, fd;
 	char buf[128];
 
-	if (ret = __open_once(&syspower.fd_wakeup, path_wakeup_irq, O_RDONLY))
+	if ((ret = __open_once(&syspower.fd_wakeup, path_wakeup_irq, O_RDONLY)))
 		return ret;
 
 	ret = READ_RETRY(syspower.fd_wakeup, buf, sizeof(buf));
@@ -257,7 +257,7 @@ int syspower_wake_unlock(const char *name)
 	size_t len = strlen(name) + 1;
 	int ret;
 
-	if (ret = __open_once(&syspower.fd_unlock, path_wake_unlock, O_RDWR))
+	if ((ret = __open_once(&syspower.fd_unlock, path_wake_unlock, O_RDWR)))
 		return -errno;
 
 	ret = WRITE_RETRY(syspower.fd_unlock, name, len);

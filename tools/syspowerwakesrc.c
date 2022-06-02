@@ -21,7 +21,6 @@ void list_wakeup(void)
 
 int main(int argc, char *argv[])
 {
-	char wakeup_reason[128];
 	int ret = 0;
 
 	if (argc < 2)
