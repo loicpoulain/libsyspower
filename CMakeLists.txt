@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 2.6)
 project (libsyspower)
 
 add_library(syspower lib/core.c)
+target_link_libraries(syspower PRIVATE udev)
 target_compile_options(syspower PRIVATE -Werror -Wall -Wextra)
 target_include_directories(syspower PUBLIC include)
 
@@ -16,3 +17,9 @@ target_include_directories(syspowerwakesrc PRIVATE include)
 target_link_libraries(syspowerwakesrc PRIVATE syspower)
 target_compile_options(syspowerwakesrc PRIVATE -Werror -Wall -Wextra)
 install(TARGETS syspowerwakesrc DESTINATION sbin)
+
+add_executable(syspowersupply tools/syspowersupply.c)
+target_include_directories(syspowersupply PRIVATE include)
+target_link_libraries(syspowersupply PRIVATE syspower)
+target_compile_options(syspowersupply PRIVATE -Werror -Wall -Wextra)
+install(TARGETS syspowersupply DESTINATION sbin)

@@ -17,7 +17,10 @@
 #include <dirent.h>
 #include <syspower.h>
 #include <libgen.h>
+#include <libudev.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <linux/rtc.h>
 #include <linux/limits.h>
@@ -28,6 +31,8 @@ static const char path_wake_lock[] = "/sys/power/wake_lock";
 static const char path_state[] = "/sys/power/state";
 static const char path_wakeup_irq[] = "/sys/power/pm_wakeup_irq";
 static const char path_rtc_dev[] = "/dev/rtc";
+static const char path_supply[128] = "/sys/class/power_supply";
+static struct udev_monitor *udevmon;
 
 #define WAKEDEV_COUNT 128
 
@@ -41,7 +46,6 @@ static struct {
 	int fd_unlock;
 	int fd_state;
 	int fd_autosleep;
-	int fd_wakeup;
 	int fd_rtc;
 	unsigned int sleep_mask;
 	struct wakeup_source *wakeup_cache[WAKEDEV_COUNT];
@@ -59,7 +63,7 @@ static inline int OPEN_RETRY(const char *path, int flags)
 	int fd;
 
 	do {
-		fd = open(path, flags);
+		fd = open(path, flags | O_SYNC);
 	} while (fd == -1 && errno == EINTR);
 
 	/* If required pseudo-file not present, operation is not supported */
@@ -159,7 +163,7 @@ int syspower_autosleep_enable(enum syspower_sleep_type type)
 		return ret;
 
 	ret = WRITE_RETRY(syspower.fd_autosleep, sleep_state[type], len);
-	if (ret != len)
+	if (ret != (int)len)
 		return -errno;
 
 	return 0;
@@ -171,11 +175,11 @@ int syspower_autosleep_disable(void)
 
 	len = strlen("off") + 1;
 
-	if ((ret = __open_once(&syspower.fd_state, path_autosleep, O_WRONLY)))
+	if ((ret = __open_once(&syspower.fd_autosleep, path_autosleep, O_WRONLY)))
 		return ret;
 
-	ret = WRITE_RETRY(syspower.fd_state, "off", len);
-	if (ret != len)
+	ret = WRITE_RETRY(syspower.fd_autosleep, "off", len);
+	if (ret != (int)len)
 		return -errno;
 
 	return 0;
@@ -195,7 +199,7 @@ int syspower_suspend(enum syspower_sleep_type type)
 		return ret;
 
 	ret = WRITE_RETRY(syspower.fd_state, sleep_state[type], len);
-	if (ret != len)
+	if (ret != (int)len)
 		return -errno;
 
 	return 0;
@@ -229,10 +233,12 @@ int syspower_wakeup_reason(char *reason, size_t reason_len)
 	int irq, ret, fd;
 	char buf[128];
 
-	if ((ret = __open_once(&syspower.fd_wakeup, path_wakeup_irq, O_RDONLY)))
-		return ret;
+	fd = OPEN_RETRY(path_wakeup_irq, O_RDONLY);
+	if (fd < 0)
+		return -errno;
 
-	ret = READ_RETRY(syspower.fd_wakeup, buf, sizeof(buf));
+	ret = READ_RETRY(fd, buf, sizeof(buf));
+	close(fd);
 	if (ret < 0)
 		return -errno;
 
@@ -433,7 +439,7 @@ int syspower_wakeup_disable(const char *wakeupname)
 bool syspower_wakeup_enabled(const char *wakeupname)
 {
 	struct wakeup_source *ws = __wakeup_source_lookup(wakeupname);
-	char attr[128];
+	char attr[128] = "";
 
 	if (!ws)
 		return -ENOENT;
@@ -443,4 +449,170 @@ bool syspower_wakeup_enabled(const char *wakeupname)
 		return true;
 
 	return false;
+}
+
+char *syspower_supply_get(unsigned int index)
+{
+	static struct dirent *files = NULL;
+	char *supply =  NULL;
+	unsigned int i = 0;
+
+	DIR *dir = opendir(path_supply);
+	if (!dir)
+		return NULL;
+
+	while ((files = readdir(dir)) != NULL) {
+		if (!strcmp(files->d_name, ".") || !strcmp(files->d_name, ".."))
+			continue;
+		if (i++ == index) {
+			supply = strdup(files->d_name);
+			break;
+		}
+	}
+
+	closedir(dir);
+
+	return supply;
+}
+
+bool syspower_supply_present(const char *supplyname)
+{
+	char path[128];
+	char attr[8] = "";
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+	__read_attribute(attr, path, "present");
+	if (!strncmp("1", attr, strlen("1")))
+		return true;
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+	__read_attribute(attr, path, "online");
+	if (!strncmp("1", attr, strlen("1")))
+		return true;
+
+	return false;
+}
+
+enum syspower_supply_type syspower_supply_type(const char *supplyname)
+{
+	char path[128];
+	char attr[128] = "";
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+	__read_attribute(attr, path, "type");
+
+	if (!strncmp("Battery", attr, strlen("Battery")))
+		return SYSPOWER_SUPPLY_TYPE_BATTERY;
+	if (!strncmp("USB", attr, strlen("USB")))
+		return SYSPOWER_SUPPLY_TYPE_USB;
+	if (!strncmp("UPS", attr, strlen("UPS")))
+		return SYSPOWER_SUPPLY_TYPE_UPS;
+	if (!strncmp("Mains", attr, strlen("Mains")))
+		return SYSPOWER_SUPPLY_TYPE_MAIN;
+	if (!strncmp("Wireless", attr, strlen("Wireless")))
+		return SYSPOWER_SUPPLY_TYPE_WIRELESS;
+	if (!strncmp("BMS", attr, strlen("BMS")))
+		return SYSPOWER_SUPPLY_TYPE_BMS;
+	if (!strncmp("Wipower", attr, strlen("Wipower")))
+		return SYSPOWER_SUPPLY_TYPE_WIPOWER;
+
+	return SYSPOWER_SUPPLY_TYPE_UNKNOWN;
+}
+
+uint8_t syspower_supply_capacity(const char *supplyname)
+{
+	char path[128];
+	char attr[8] = "255";
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+	__read_attribute(attr, path, "capacity");
+
+	return (uint8_t)atoi(attr);
+}
+
+uint8_t syspower_supply_capacity_min(const char *supplyname)
+{
+	char path[128];
+	char attr[8] = "255";
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+	__read_attribute(attr, path, "capacity_alert_min");
+
+	return (uint8_t)atoi(attr);
+}
+
+uint8_t syspower_supply_capacity_max(const char *supplyname)
+{
+	char path[128];
+	char attr[8] = "255";
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+	__read_attribute(attr, path, "capacity_alert_max");
+
+	return (uint8_t)atoi(attr);
+}
+
+enum syspower_supply_status syspower_supply_status(const char *supplyname)
+{
+	char attr[32] = "";
+	char path[128];
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+	__read_attribute(attr, path, "status");
+
+	if (!strncmp("Charging", attr, strlen("USB")))
+		return SYSPOWER_BATTERY_STATUS_CHARGING;
+	if (!strncmp("Discharging", attr, strlen("UPS")))
+		return SYSPOWER_BATTERY_STATUS_DISCHARGING;
+	if (!strncmp("Not charging", attr, strlen("Mains")))
+		return SYSPOWER_BATTERY_STATUS_NOTCHARGING;
+	if (!strncmp("Full", attr, strlen("Wireless")))
+		return SYSPOWER_BATTERY_STATUS_FULL;
+	else
+		return SYSPOWER_BATTERY_STATUS_UNKWOWN;
+}
+
+int syspower_supply_get_monitorfd(void)
+{
+	struct udev *udev;
+
+	if (udevmon) {
+		udev = udev_ref(udev_monitor_get_udev(udevmon));
+		udevmon = udev_monitor_ref(udevmon);
+	} else {
+		udev = udev_new();
+		udevmon = udev_monitor_new_from_netlink(udev, "kernel");
+		udev_monitor_filter_add_match_subsystem_devtype(udevmon, "power_supply", NULL);
+		udev_monitor_enable_receiving(udevmon);
+	}
+
+	return udev_monitor_get_fd(udevmon);
+}
+
+int syspower_supply_read_monitorfd(int fd, char *supplyname, size_t maxlen)
+{
+	struct udev_device *dev;
+
+	if (fd < 0 || !udevmon)
+		return -EINVAL;
+
+	dev = udev_monitor_receive_device(udevmon);
+	if (!dev)
+		return -errno;
+
+	if (supplyname)
+		strncpy(supplyname, udev_device_get_sysname(dev), maxlen);
+
+	udev_device_unref(dev);
+
+	return 0;
+}
+
+void syspower_supply_put_monitorfd(int fd)
+{
+	if (fd < 0)
+		return;
+
+	udev_unref(udev_monitor_get_udev(udevmon));
+	udevmon = udev_monitor_unref(udevmon);
 }

@@ -24,6 +24,26 @@ enum syspower_sleep_type {
 	SYSPOWER_SLEEP_TYPE_MAX
 };
 
+enum syspower_supply_type {
+	SYSPOWER_SUPPLY_TYPE_UNKNOWN,
+	SYSPOWER_SUPPLY_TYPE_BATTERY,
+	SYSPOWER_SUPPLY_TYPE_UPS,
+	SYSPOWER_SUPPLY_TYPE_MAIN,
+	SYSPOWER_SUPPLY_TYPE_USB,
+	SYSPOWER_SUPPLY_TYPE_WIRELESS,
+	SYSPOWER_SUPPLY_TYPE_BMS,
+	SYSPOWER_SUPPLY_TYPE_WIPOWER,
+	SYSPOWER_SUPPLY_TYPE_MAX
+};
+
+enum syspower_supply_status {
+	SYSPOWER_BATTERY_STATUS_UNKWOWN,
+	SYSPOWER_BATTERY_STATUS_CHARGING,
+	SYSPOWER_BATTERY_STATUS_FULL,
+	SYSPOWER_BATTERY_STATUS_NOTCHARGING,
+	SYSPOWER_BATTERY_STATUS_DISCHARGING,
+};
+
 /**
  * @brief Enable system autosleep.
  * @param type Sleep type (cf syspower_sleep_type enum)
@@ -102,6 +122,75 @@ int syspower_wakeup_enable(const char *devname);
  * @return 0 on success, negative value on error.
  */
 int syspower_wakeup_disable(const char *devname);
+
+/**
+ * @brief Retrieve supply presence.
+ * @param supplyname supply name.
+ * @return true if supply is present, false otherwise.
+ */
+bool syspower_supply_present(const char *supplyname);
+
+/**
+ * @brief Retrieve supply type.
+ * @param supplyname supply name.
+ * @return supply type.
+ */
+enum syspower_supply_type syspower_supply_type(const char *supplyname);
+
+/**
+ * @brief Retrieve supply device name by index.
+ * @param index index of the device.
+ * @return device name.
+ */
+char *syspower_supply_get(unsigned int index);
+
+/**
+ * @brief Retrieve supply capacity.
+ * @param supplyname supply name.
+ * @return capacity in in *percents*, from 0 to 100.
+ */
+uint8_t syspower_supply_capacity(const char *supplyname);
+
+/**
+ * @brief Retrieve minimum supply capacity (causing alert event).
+ * @param supplyname supply name.
+ * @return capacity in *percents*, from 0 to 100.
+ */
+uint8_t syspower_supply_capacity_min(const char *supplyname);
+
+/**
+ * @brief Retrieve maximum supply capacity (causing alert event).
+ * @param supplyname supply name.
+ * @return capacity in *percents*, from 0 to 100.
+ */
+uint8_t syspower_supply_capacity_max(const char *supplyname);
+
+/**
+ * @brief Retrieve supply status (for battery).
+ * @param supplyname supply name.
+ * @return supply status.
+ */
+enum syspower_supply_status syspower_supply_status(const char *supplyname);
+
+/**
+ * @brief Retrieve power supply monitoring file descriptor for polling.
+ * @return file descriptor or negative error code.
+ */
+int syspower_supply_get_monitorfd(void);
+
+/**
+ * @brief Release monitor file descriptor.
+ * @param fd file descriptor of the power supply monitor
+ */
+void syspower_supply_put_monitorfd(int fd);
+
+/**
+ * @brief Read monitor event and associated supply name.
+ * @param fd file descriptor of the power supply monitor
+ * @param supplyname pointer to the supplyname string to write in.
+ * @param maxlen maximum length of the supplyname string.
+ */
+int syspower_supply_read_monitorfd(int fd, char *supplyname, size_t maxlen);
 
 #ifdef __cplusplus
 } /* extern "C" */
