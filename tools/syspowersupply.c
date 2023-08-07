@@ -22,6 +22,8 @@ char *supply_status[] = {
 
 static void print_supply_info(const char *supply)
 {
+	int mA;
+
 	printf("=== %s ===\n", supply);
 
 	switch (syspower_supply_type(supply)) {
@@ -41,6 +43,18 @@ static void print_supply_info(const char *supply)
 		printf("type: UNKOWN\n");
 		break;
 	}
+
+	mA = syspower_supply_current(supply, SYSPOWER_SUPPLY_CURRENT_MAX);
+	if (mA >= 0)
+		printf("current-limit: %dmA\n", mA);
+
+	mA = syspower_supply_current(supply, SYSPOWER_SUPPLY_CURRENT_AVG);
+	if (mA >= 0)
+		printf("current-avg: %dmA\n", mA);
+
+	mA = syspower_supply_current(supply, SYSPOWER_SUPPLY_CURRENT_NOW);
+	if (mA >= 0)
+		printf("current-now: %dmA\n", mA);
 
 	printf("connected: %s\n", syspower_supply_present(supply) ? "yes" : "no");
 }
