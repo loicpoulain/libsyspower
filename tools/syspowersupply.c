@@ -22,7 +22,8 @@ char *supply_status[] = {
 
 static void print_supply_info(const char *supply)
 {
-	int mA;
+	char health[30];
+	int mA, mV;
 
 	printf("=== %s ===\n", supply);
 
@@ -44,17 +45,26 @@ static void print_supply_info(const char *supply)
 		break;
 	}
 
+	if (syspower_supply_health(supply, health) >= 0)
+		printf("health: %s\n", health);
+
 	mA = syspower_supply_current(supply, SYSPOWER_SUPPLY_CURRENT_MAX);
-	if (mA >= 0)
-		printf("current-limit: %dmA\n", mA);
+	mV = syspower_supply_voltage(supply, SYSPOWER_SUPPLY_VOLTAGE_MAX);
+	if (mA >= 0 || mV >= 0)
+		printf("max: %dmA/%dmV/%dmW\n", mA >= 0 ? mA : 0, mV >= 0 ? mV : 0,
+						mA * mV >= 0 ? mA * mV / 1000 : 0);
 
 	mA = syspower_supply_current(supply, SYSPOWER_SUPPLY_CURRENT_AVG);
-	if (mA >= 0)
-		printf("current-avg: %dmA\n", mA);
+	mV = syspower_supply_voltage(supply, SYSPOWER_SUPPLY_VOLTAGE_AVG);
+	if (mA >= 0 || mV >= 0)
+		printf("avg: %dmA/%dmV/%dmW\n", mA >= 0 ? mA : 0, mV >= 0 ? mV : 0,
+						mA * mV >= 0 ? mA * mV / 1000 : 0);
 
 	mA = syspower_supply_current(supply, SYSPOWER_SUPPLY_CURRENT_NOW);
-	if (mA >= 0)
-		printf("current-now: %dmA\n", mA);
+	mV = syspower_supply_voltage(supply, SYSPOWER_SUPPLY_VOLTAGE_NOW);
+	if (mA >= 0 || mV >= 0)
+		printf("now: %dmA/%dmV/%dmW\n", mA >= 0 ? mA : 0, mV >= 0 ? mV : 0,
+						mA * mV >= 0 ? mA * mV / 1000: 0);
 
 	printf("connected: %s\n", syspower_supply_present(supply) ? "yes" : "no");
 }
