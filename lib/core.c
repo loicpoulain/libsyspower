@@ -519,6 +519,39 @@ enum syspower_supply_type syspower_supply_type(const char *supplyname)
 	return SYSPOWER_SUPPLY_TYPE_UNKNOWN;
 }
 
+int syspower_supply_current(const char *supplyname,
+			    enum syspower_supply_current current_type)
+{
+	char attr[10] = "0";
+	char path[128];
+	int ret, mA;
+
+	if (current_type > SYSPOWER_SUPPLY_CURRENT_MAX)
+		return -EINVAL;
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+
+	switch (current_type) {
+	case SYSPOWER_SUPPLY_CURRENT_MAX:
+		ret = __read_attribute(attr, path, "current_max");
+		break;
+	case SYSPOWER_SUPPLY_CURRENT_AVG:
+		ret = __read_attribute(attr, path, "current_avg");
+		break;
+	case SYSPOWER_SUPPLY_CURRENT_NOW:
+		ret = __read_attribute(attr, path, "current_now");
+		break;
+	}
+
+	if (ret)
+		return ret;
+
+	mA = atoi(attr) / 1000;
+	if (mA < 0) mA = -mA; /* Discharging current ? */
+
+	return atoi(attr) / 1000;
+}
+
 uint8_t syspower_supply_capacity(const char *supplyname)
 {
 	char path[128];

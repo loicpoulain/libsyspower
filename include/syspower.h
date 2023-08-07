@@ -36,6 +36,12 @@ enum syspower_supply_type {
 	SYSPOWER_SUPPLY_TYPE_MAX
 };
 
+enum syspower_supply_current {
+	SYSPOWER_SUPPLY_CURRENT_AVG,
+	SYSPOWER_SUPPLY_CURRENT_NOW,
+	SYSPOWER_SUPPLY_CURRENT_MAX /* this is a valid current type */
+};
+
 enum syspower_supply_status {
 	SYSPOWER_BATTERY_STATUS_UNKWOWN,
 	SYSPOWER_BATTERY_STATUS_CHARGING,
@@ -164,6 +170,15 @@ uint8_t syspower_supply_capacity_min(const char *supplyname);
  * @return capacity in *percents*, from 0 to 100.
  */
 uint8_t syspower_supply_capacity_max(const char *supplyname);
+
+/**
+ * @brief Retrieve supply current value.
+ * @param supplyname supply name.
+ * @current_type current type (max, avg, min).
+ * @return current value in mA.
+ */
+int syspower_supply_current(const char *supplyname,
+			    enum syspower_supply_current current_type);
 
 /**
  * @brief Retrieve supply status (for battery).
