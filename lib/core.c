@@ -25,6 +25,9 @@
 #include <linux/rtc.h>
 #include <linux/limits.h>
 
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
 static const char path_autosleep[] = "/sys/power/autosleep";
 static const char path_wake_unlock[] = "/sys/power/wake_unlock";
 static const char path_wake_lock[] = "/sys/power/wake_lock";
@@ -541,6 +544,8 @@ int syspower_supply_current(const char *supplyname,
 	case SYSPOWER_SUPPLY_CURRENT_NOW:
 		ret = __read_attribute(attr, path, "current_now");
 		break;
+	default:
+		return -EINVAL;
 	}
 
 	if (ret)
@@ -549,7 +554,89 @@ int syspower_supply_current(const char *supplyname,
 	mA = atoi(attr) / 1000;
 	if (mA < 0) mA = -mA; /* Discharging current ? */
 
-	return atoi(attr) / 1000;
+	return mA;
+}
+
+int syspower_supply_voltage(const char *supplyname,
+			    enum syspower_supply_voltage voltage_type)
+{
+	char attr[10] = "0";
+	char path[128];
+	int ret, mV;
+
+	if (voltage_type > SYSPOWER_SUPPLY_VOLTAGE_MAX)
+		return -EINVAL;
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+
+	switch (voltage_type) {
+	case SYSPOWER_SUPPLY_VOLTAGE_AVG:
+		ret = __read_attribute(attr, path, "voltage_avg");
+		break;
+	case SYSPOWER_SUPPLY_VOLTAGE_MAX:
+		ret = __read_attribute(attr, path, "voltage_max");
+		break;
+	case SYSPOWER_SUPPLY_VOLTAGE_MIN:
+		ret = __read_attribute(attr, path, "voltage_min");
+		break;
+	case SYSPOWER_SUPPLY_VOLTAGE_NOW:
+		ret = __read_attribute(attr, path, "voltage_now");
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (ret)
+		return ret;
+
+	mV = atoi(attr) / 1000;
+
+	return mV;
+}
+
+static const char *supply_health[] = {
+	"Unknown",
+	"Good",
+	"Overheat",
+	"Dead",
+	"Over voltage",
+	"Unspecified failure",
+	"Cold",
+	"Watchdog timer expire",
+	"Safety timer expire",
+	"Over current",
+	"Calibration required",
+	"Warm",
+	"Cool",
+	"Hot",
+	"No battery"
+};
+
+enum syspower_supply_health syspower_supply_health(const char *supplyname, char *health_str)
+{
+	char attr[30] = "0";
+	unsigned int i = 0;
+	char path[128];
+	int ret;
+
+	sprintf(path, "%s/%s", path_supply, supplyname);
+
+	ret  = __read_attribute(attr, path, "health");
+	if (ret) {
+		strcpy(health_str, "Unknown");
+		return SYSPOWER_SUPPLY_HEALTH_UNKWOWN;
+	}
+
+	if (health_str)
+		strcpy(health_str, attr);
+
+	while (i < ARRAY_SIZE(supply_health)) {
+		if (!strncmp(supply_health[i], attr, strlen(supply_health[i])))
+			return i;
+		i++;
+	}
+
+	return -EINVAL;
 }
 
 uint8_t syspower_supply_capacity(const char *supplyname)

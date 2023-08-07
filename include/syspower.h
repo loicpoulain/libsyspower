@@ -42,12 +42,37 @@ enum syspower_supply_current {
 	SYSPOWER_SUPPLY_CURRENT_MAX /* this is a valid current type */
 };
 
+enum syspower_supply_voltage {
+	SYSPOWER_SUPPLY_VOLTAGE_AVG,
+	SYSPOWER_SUPPLY_VOLTAGE_NOW,
+	SYSPOWER_SUPPLY_VOLTAGE_MIN,
+	SYSPOWER_SUPPLY_VOLTAGE_MAX /* this is a valid voltage type */
+};
+
 enum syspower_supply_status {
 	SYSPOWER_BATTERY_STATUS_UNKWOWN,
 	SYSPOWER_BATTERY_STATUS_CHARGING,
 	SYSPOWER_BATTERY_STATUS_FULL,
 	SYSPOWER_BATTERY_STATUS_NOTCHARGING,
 	SYSPOWER_BATTERY_STATUS_DISCHARGING,
+};
+
+enum syspower_supply_health {
+	SYSPOWER_SUPPLY_HEALTH_UNKWOWN,
+	SYSPOWER_SUPPLY_HEALTH_GOOD,
+	SYSPOWER_SUPPLY_HEALTH_OVERHEAT,
+	SYSPOWER_SUPPLY_HEALTH_DEAD,
+	SYSPOWER_SUPPLY_HEALTH_OVERVOLTAGE,
+	SYSPOWER_SUPPLY_HEALTH_FAILURE,
+	SYSPOWER_SUPPLY_HEALTH_COLD,
+	SYSPOWER_SUPPLY_HEALTH_WATCHDOG_EXPR,
+	SYSPOWER_SUPPLY_HEALTH_SAFETY_EXPR,
+	SYSPOWER_SUPPLY_HEALTH_OVERCURRENT,
+	SYSPOWER_SUPPLY_HEALTH_CALIBRATION,
+	SYSPOWER_SUPPLY_HEALTH_WARM,
+	SYSPOWER_SUPPLY_HEALTH_COOL,
+	SYSPOWER_SUPPLY_HEALTH_HOT,
+	SYSPOWER_SUPPLY_HEALTH_NOBAT,
 };
 
 /**
@@ -174,11 +199,20 @@ uint8_t syspower_supply_capacity_max(const char *supplyname);
 /**
  * @brief Retrieve supply current value.
  * @param supplyname supply name.
- * @current_type current type (max, avg, min).
+ * @current_type current type (max, avg, now).
  * @return current value in mA.
  */
 int syspower_supply_current(const char *supplyname,
 			    enum syspower_supply_current current_type);
+
+/**
+ * @brief Retrieve supply voltage value.
+ * @param supplyname supply name.
+ * @voltage_type voltage type (min, max, avg, now).
+ * @return voltage value in mV.
+ */
+int syspower_supply_voltage(const char *supplyname,
+			    enum syspower_supply_voltage voltage_type);
 
 /**
  * @brief Retrieve supply status (for battery).
@@ -186,6 +220,15 @@ int syspower_supply_current(const char *supplyname,
  * @return supply status.
  */
 enum syspower_supply_status syspower_supply_status(const char *supplyname);
+
+/**
+ * @brief Retrieve supply health.
+ * @param supplyname supply name.
+ * @param health_str supply health string (optional).
+ * @return supply health.
+ */
+enum syspower_supply_health syspower_supply_health(const char *supplyname,
+						   char *health_str);
 
 /**
  * @brief Retrieve power supply monitoring file descriptor for polling.
