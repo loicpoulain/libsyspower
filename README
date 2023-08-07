@@ -1,12 +1,13 @@
-libsyspower is a Linux library for managing power state and wakeup sources.
+libsyspower is a Linux library for managing power state, wakeup sources and power supplies.
 
 == build ==
 mkdir build && cd build
 cmake ../
 make
 
-=== tools ===
-prompt: ~/ ./syspowerwakesrc list
+=== tools/demo ===
+```
+$ ./syspowerwakesrc list
 Device                         HW wakeup
 |- 2-0024                      [disabled]
 |- 30b10000.usb                [disabled]
@@ -21,3 +22,49 @@ prompt: ~/ ./syspowerwakesrc enable 2-0024
 prompt: ~/ ./syspowernap 
 Sleeping now...
 Wakeup! (2-0024/irq:74)
+```
+
+```
+$ ./syspowersupply monitor
+=== BAT0 ===
+type: BATTERY
+capacity: 97%
+status: NotCharging
+health: Warm
+now: 0mA/12234mV/0mW
+connected: yes
+=== AC ===
+type: MAIN
+health: Unknown
+connected: yes
+```
+
+```
+ ./syspowerwakesrc list
+Device                         HW wakeup
+|- 00:04                       [enabled]
+|- alarmtimer.0.auto           [enabled]
+|- serio0                      [disabled]
+|- serio1                      [disabled]
+|- 0000:00:1c.0                [enabled]
+|- 0000:04:00.0                [disabled]
+|- 1-3.2.4                     [disabled]
+|- 1-3.2                       [disabled]
+|- 1-3.2.3.3                   [enabled]
+|- 1-3.2.3                     [disabled]
+|- 1-3.2.3.4                   [disabled]
+|- 1-3.2.1                     [disabled]
+|- 1-3                         [disabled]
+|- usb1                        [disabled]
+|- 1-6                         [disabled]
+|- 0000:00:14.0                [enabled]
+|- 2-4.2.3                     [disabled]
+|- 2-4.2                       [disabled]
+|- 2-4.2.4                     [disabled]
+|- 2-4                         [disabled]
+|- usb2                        [disabled]
+|- PNP0C0D:00                  [enabled]
+|- PNP0C0E:00                  [enabled]
+|- PNP0C0A:00                  [enabled]
+|- LNXPWRBN:00                 [enabled]
+```
