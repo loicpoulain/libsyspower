@@ -330,6 +330,8 @@ static void __sysfs_devices_parse(char *path, void (*cb)(char *devpath))
 	DIR *d;
 
 	d = opendir(path);
+	if (!d)
+		return;
 
 	while ((dir = readdir(d))) {
 		if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
